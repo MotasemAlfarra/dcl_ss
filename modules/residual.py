@@ -124,14 +124,14 @@ class ResidualBlock(nn.Module):
             residual = x
         x = self.convs(x) + residual
 
-        if self.convs.bn1.activation == "leaky_relu":
-            act = functional.leaky_relu(
-                x, negative_slope=self.convs.bn1.activation_param, inplace=not self._last
-            )
-        elif self.convs.bn1.activation == "elu":
-            act = functional.elu(x, alpha=self.convs.bn1.activation_param, inplace=not self._last)
-        elif self.convs.bn1.activation == "identity":
-            act = x
+        # if self.convs.bn1.activation == "leaky_relu":
+        #     act = functional.leaky_relu(
+        #         x, negative_slope=self.convs.bn1.activation_param, inplace=not self._last
+        #     )
+        # elif self.convs.bn1.activation == "elu":
+        #     act = functional.elu(x, alpha=self.convs.bn1.activation_param, inplace=not self._last)
+        # elif self.convs.bn1.activation == "identity":
+        act = x
 
         if self._last:
             return act, x
