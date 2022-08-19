@@ -343,7 +343,8 @@ def run_step(opts, world_size, rank, device):
     if opts.step > 0 and step_checkpoint is not None:
         if 'trainer_state' in step_checkpoint:
             trainer_state = step_checkpoint['trainer_state']
-
+    # import pdb
+    # pdb.set_trace()
     # instance trainer (model must have already the previous step weights)
     trainer = Trainer(
         model,
