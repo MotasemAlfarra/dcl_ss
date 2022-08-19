@@ -213,8 +213,8 @@ class Trainer:
         for cur_step, (images, labels) in enumerate(train_loader):
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
-            print("I am here")
-            print(images.shape, labels.shape)
+            # print("I am here")
+            # print(images.shape, labels.shape)
             
             original_labels = labels.clone()
 
@@ -299,8 +299,8 @@ class Trainer:
 
             optim.zero_grad()
             outputs, features = model(images, ret_intermediate=self.ret_intermediate)
-            print("Here I  am")
-            print(outputs.shape)
+            # print("Here I  am")
+            # print(outputs.shape)
             # xxx BCE / Cross Entropy Loss
             if self.pseudo_soft is not None:
                 loss = soft_crossentropy(
