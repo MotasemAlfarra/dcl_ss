@@ -5,6 +5,7 @@ import numpy as np
 import torch.utils.data as data
 import torchvision as tv
 from PIL import Image
+from torch import distributed
 
 from .utils import Subset
 
@@ -135,8 +136,16 @@ class ACDC_Incremental(data.Dataset):
         overlap=True,
         **kwargs
     ):
-        full_data = ACDC(root, train)
 
+        full_data = ACDC(root, train)
+        # print('length', len(full_data))
+        # if idxs_path is not None and os.path.exists(idxs_path):
+        #     idxs = np.load(idxs_path).tolist()
+        # else:
+        #     print("I am here")
+        idxs = filter_images(full_data, labels)
+        if idxs_path is not None and distributed.get_rank() == 0:
+            np.save(idxs_path, np.array(idxs, dtype=int))
 
         rnd = np.random.RandomState(1)
         rnd.shuffle(idxs)
@@ -167,3 +176,19 @@ class ACDC_Incremental(data.Dataset):
 
     def __len__(self):
         return len(self.dataset)
+
+
+
+def filter_images(dataset, labels):
+    # This just returns the set of all indices
+    idxs = []
+
+    print(f"Filtering images...")
+    for i in range(len(dataset)):
+        idxs.append(i)
+        # domain_id = dataset.__getitem__(i, get_domain=True)  # taking domain id
+        # if domain_id in labels:
+        #     idxs.append(i)
+        # if i % 1000 == 0:
+        #     print(f"\t{i}/{len(dataset)} ...")
+    return idxs

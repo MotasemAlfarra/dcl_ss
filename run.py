@@ -13,7 +13,7 @@ from torch.utils.data.distributed import DistributedSampler
 import argparser
 import tasks
 import utils
-from dataset import (AdeSegmentationIncremental,
+from dataset import (AdeSegmentationIncremental, ACDC_Incremental,
                      CityscapesSegmentationIncrementalDomain,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
@@ -75,6 +75,8 @@ def get_dataset(opts):
         dataset = AdeSegmentationIncremental
     elif opts.dataset == 'cityscapes_domain':
         dataset = CityscapesSegmentationIncrementalDomain
+    elif opts.dataset == 'acdc':
+        dataset = ACDC_Incremental
     else:
         raise NotImplementedError
 
