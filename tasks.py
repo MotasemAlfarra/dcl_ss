@@ -147,7 +147,7 @@ tasks_voc = {
 }
 
 tasks_acdc_domain = {
-    "offline": {0: list(range(21))}
+    "offline": {0: list(range(19))}
    
 }
 tasks_cityscapes_domain = {
