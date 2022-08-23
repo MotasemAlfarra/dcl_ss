@@ -180,7 +180,7 @@ def get_argparser():
     parser.add_argument(
         "--sample_num",
         type=int,
-        default=1,
+        default=0,
         help='number of samples for visualization (default: 0)'
     )
     parser.add_argument("--debug", action='store_true', default=False, help="verbose option")
