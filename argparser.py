@@ -69,6 +69,8 @@ def get_argparser():
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--random_seed", type=int, default=42, help="random seed (default: 42)")
     parser.add_argument("--num_workers", type=int, default=1, help='number of workers (default: 1)')
+    parser.add_argument("--number_internal_steps", type=int, default=1, 
+                        help='number of training steps on each batch before recieving the next batch)')
 
     # Datset Options
     parser.add_argument("--data_root", type=str, default='data', help="path to Dataset")
@@ -80,9 +82,9 @@ def get_argparser():
         help='Name of dataset'
     )
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
-    parser.add_argument(
-        "--dont_predict_bg", action="store_true", default=False, help="Useful for cityscapes"
-    )
+    # parser.add_argument(
+    #     "--dont_predict_bg", action="store_true", default=False, help="Useful for cityscapes"
+    # )
 
     # Method Options
     # BE CAREFUL USING THIS, THEY WILL OVERRIDE ALL THE OTHER PARAMETERS.

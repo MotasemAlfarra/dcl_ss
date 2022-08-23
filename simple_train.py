@@ -26,7 +26,7 @@ class Trainer:
         self.model = model
         self.device = device
         self.step = step
-
+        self.num_internal_steps = opts.number_internal_steps
         if opts.dataset == "cityscapes_domain":
             self.old_classes = opts.num_classes
             self.nb_classes = opts.num_classes
@@ -184,7 +184,7 @@ class Trainer:
 
     def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
         """Train and return epoch loss"""
-        logger.info(f"Pseudo labeling is: {self.pseudo_labeling}")
+        # logger.info(f"Pseudo labeling is: {self.pseudo_labeling}")
         logger.info("Epoch %d, lr = %f" % (cur_epoch, optim.param_groups[0]['lr']))
 
         device = self.device
@@ -192,288 +192,56 @@ class Trainer:
         criterion = self.criterion
 
         model.module.in_eval = False
-        if self.model_old is not None:
-            self.model_old.in_eval = False
 
-        epoch_loss = 0.0
-        reg_loss = 0.0
-        interval_loss = 0.0
-        lkd = torch.tensor(0.)
-        lde = torch.tensor(0.)
-        l_icarl = torch.tensor(0.)
-        l_reg = torch.tensor(0.)
-        pod_loss = torch.tensor(0.)
-        loss_entmin = torch.tensor(0.)
+        epoch_loss, reg_loss, interval_loss = 0.0, 0.0, 0.0
 
         sample_weights = None
 
         train_loader.sampler.set_epoch(cur_epoch)
 
         model.train()
+        print('self.numeber of internal steps is:', self.num_internal_steps)
         for cur_step, (images, labels) in enumerate(train_loader):
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
-            # print("I am here")
-            # print(images.shape, labels.shape)
             
             original_labels = labels.clone()
+            for _ in range(self.num_internal_steps):
+                optim.zero_grad()
+                outputs, features = model(images, ret_intermediate=self.ret_intermediate)
+                loss = criterion(outputs, labels)  # B x H x W
+                
+                if self.sample_weights_new is not None:
+                    sample_weights = torch.ones_like(original_labels).to(device, dtype=torch.float32)
+                    sample_weights[original_labels >= 0] = self.sample_weights_new
 
-            if (
-                self.lde_flag or self.lkd_flag or self.icarl_dist_flag or self.pod is not None or
-                self.pseudo_labeling is not None
-            ) and self.model_old is not None:
-                with torch.no_grad():
-                    outputs_old, features_old = self.model_old(
-                        images, ret_intermediate=self.ret_intermediate
-                    )
+                loss = loss.mean()  # scalar
 
-            classif_adaptive_factor = 1.0
-            if self.step > 0:
-                mask_background = labels < self.old_classes
+                # xxx first backprop of previous loss (compute the gradients for regularization methods)
+                loss_tot = loss #+ lkd + lde + l_icarl + pod_loss + loss_entmin
 
-                if self.pseudo_labeling == "naive":
-                    labels[mask_background] = outputs_old.argmax(dim=1)[mask_background]
-                elif self.pseudo_labeling is not None and self.pseudo_labeling.startswith(
-                    "threshold_"
-                ):
-                    threshold = float(self.pseudo_labeling.split("_")[1])
-                    probs = torch.softmax(outputs_old, dim=1)
-                    pseudo_labels = probs.argmax(dim=1)
-                    pseudo_labels[probs.max(dim=1)[0] < threshold] = 255
-                    labels[mask_background] = pseudo_labels[mask_background]
-                elif self.pseudo_labeling == "confidence":
-                    probs_old = torch.softmax(outputs_old, dim=1)
-                    labels[mask_background] = probs_old.argmax(dim=1)[mask_background]
-                    sample_weights = torch.ones_like(labels).to(device, dtype=torch.float32)
-                    sample_weights[mask_background] = probs_old.max(dim=1)[0][mask_background]
-                elif self.pseudo_labeling == "median":
-                    probs = torch.softmax(outputs_old, dim=1)
-                    max_probs, pseudo_labels = probs.max(dim=1)
-                    pseudo_labels[max_probs < self.thresholds[pseudo_labels]] = 255
-                    labels[mask_background] = pseudo_labels[mask_background]
-                elif self.pseudo_labeling == "entropy":
-                    probs = torch.softmax(outputs_old, dim=1)
-                    max_probs, pseudo_labels = probs.max(dim=1)
+                with amp.scale_loss(loss_tot, optim) as scaled_loss:
+                    scaled_loss.backward()
 
-                    mask_valid_pseudo = (entropy(probs) /
-                                         self.max_entropy) < self.thresholds[pseudo_labels]
+                # xxx Regularizer (EWC, RW, PI)
+                if self.regularizer_flag:
+                    if distributed.get_rank() == 0:
+                        self.regularizer.update()
+                    l_reg = self.reg_importance * self.regularizer.penalty()
+                    if l_reg != 0.:
+                        with amp.scale_loss(l_reg, optim) as scaled_loss:
+                            scaled_loss.backward()
 
-
-                    if self.pseudo_soft is None:
-                        # All old labels that are NOT confident enough to be used as pseudo labels:
-                        labels[~mask_valid_pseudo & mask_background] = 255
-
-                        if self.pseudo_ablation is None:
-                            # All old labels that are confident enough to be used as pseudo labels:
-                            labels[mask_valid_pseudo & mask_background] = pseudo_labels[mask_valid_pseudo &
-                                                                                        mask_background]
-                        elif self.pseudo_ablation == "corrected_errors":
-                            pass  # If used jointly with data_masking=current+old, the labels already
-                                  # contrain the GT, thus all potentials errors were corrected.
-                        elif self.pseudo_ablation == "removed_errors":
-                            pseudo_error_mask = labels != pseudo_labels
-                            kept_pseudo_labels = mask_valid_pseudo & mask_background & ~pseudo_error_mask
-                            removed_pseudo_labels = mask_valid_pseudo & mask_background & pseudo_error_mask
-
-                            labels[kept_pseudo_labels] = pseudo_labels[kept_pseudo_labels]
-                            labels[removed_pseudo_labels] = 255
-                        else:
-                            raise ValueError(f"Unknown type of pseudo_ablation={self.pseudo_ablation}")
-                    elif self.pseudo_soft == "soft_uncertain":
-                        labels[mask_valid_pseudo & mask_background] = pseudo_labels[mask_valid_pseudo &
-                                                                                    mask_background]
-
-                    if self.classif_adaptive_factor:
-                        # Number of old/bg pixels that are certain
-                        num = (mask_valid_pseudo & mask_background).float().sum(dim=(1,2))
-                        # Number of old/bg pixels
-                        den =  mask_background.float().sum(dim=(1,2))
-                        # If all old/bg pixels are certain the factor is 1 (loss not changed)
-                        # Else the factor is < 1, i.e. the loss is reduced to avoid
-                        # giving too much importance to new pixels
-                        classif_adaptive_factor = num / (den + 1e-6)
-                        classif_adaptive_factor = classif_adaptive_factor[:, None, None]
-
-                        if self.classif_adaptive_min_factor:
-                            classif_adaptive_factor = classif_adaptive_factor.clamp(min=self.classif_adaptive_min_factor)
-
-            optim.zero_grad()
-            outputs, features = model(images, ret_intermediate=self.ret_intermediate)
-            # print("Here I  am")
-            # print(outputs.shape)
-            # xxx BCE / Cross Entropy Loss
-            if self.pseudo_soft is not None:
-                loss = soft_crossentropy(
-                    outputs,
-                    labels,
-                    outputs_old,
-                    mask_valid_pseudo,
-                    mask_background,
-                    self.pseudo_soft,
-                    pseudo_soft_factor=self.pseudo_soft_factor
-                )
-            elif not self.icarl_only_dist:
-                if self.ce_on_pseudo and self.step > 0:
-                    assert self.pseudo_labeling is not None
-                    assert self.pseudo_labeling == "entropy"
-                    # Apply UNCE on:
-                    #   - all new classes (foreground)
-                    #   - old classes (background) that were not selected for pseudo
-                    loss_not_pseudo = criterion(
-                        outputs,
-                        original_labels,
-                        mask=mask_background & mask_valid_pseudo  # what to ignore
-                    )
-
-                    # Apply CE on:
-                    # - old classes that were selected for pseudo
-                    _labels = original_labels.clone()
-                    _labels[~(mask_background & mask_valid_pseudo)] = 255
-                    _labels[mask_background & mask_valid_pseudo] = pseudo_labels[mask_background &
-                                                                                 mask_valid_pseudo]
-                    loss_pseudo = F.cross_entropy(
-                        outputs, _labels, ignore_index=255, reduction="none"
-                    )
-                    # Each loss complete the others as they are pixel-exclusive
-                    loss = loss_pseudo + loss_not_pseudo
-                elif self.ce_on_new:
-                    _labels = labels.clone()
-                    _labels[_labels == 0] = 255
-                    loss = criterion(outputs, _labels)  # B x H x W
-                else:
-                    loss = criterion(outputs, labels)  # B x H x W
-            else:
-                loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
-
-            if self.sample_weights_new is not None:
-                sample_weights = torch.ones_like(original_labels).to(device, dtype=torch.float32)
-                sample_weights[original_labels >= 0] = self.sample_weights_new
-
-            if sample_weights is not None:
-                loss = loss * sample_weights
-            loss = classif_adaptive_factor * loss
-            loss = loss.mean()  # scalar
-
-            if self.icarl_combined:
-                # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
-                n_cl_old = outputs_old.shape[1]
-                # use n_cl_old to sum the contribution of each class, and not to average them (as done in our BCE).
-                l_icarl = self.icarl * n_cl_old * self.licarl(
-                    outputs.narrow(1, 0, n_cl_old), torch.sigmoid(outputs_old)
-                )
-
-            # xxx ILTSS (distillation on features or logits)
-            if self.lde_flag:
-                lde = self.lde * self.lde_loss(features['body'], features_old['body'])
-
-            if self.lkd_flag:
-                # resize new output to remove new logits and keep only the old ones
-                if self.lkd_mask is not None and self.lkd_mask == "oldbackground":
-                    kd_mask = labels < self.old_classes
-                elif self.lkd_mask is not None and self.lkd_mask == "new":
-                    kd_mask = labels >= self.old_classes
-                else:
-                    kd_mask = None
-
-                if self.temperature_apply is not None:
-                    temp_mask = torch.ones_like(labels).to(outputs.device).to(outputs.dtype)
-
-                    if self.temperature_apply == "all":
-                        temp_mask = temp_mask / self.temperature
-                    elif self.temperature_apply == "old":
-                        mask_bg = labels < self.old_classes
-                        temp_mask[mask_bg] = temp_mask[mask_bg] / self.temperature
-                    elif self.temperature_apply == "new":
-                        mask_fg = labels >= self.old_classes
-                        temp_mask[mask_fg] = temp_mask[mask_fg] / self.temperature
-                    temp_mask = temp_mask[:, None]
-                else:
-                    temp_mask = 1.0
-
-                if self.kd_need_labels:
-                    lkd = self.lkd * self.lkd_loss(
-                        outputs * temp_mask, outputs_old * temp_mask, labels, mask=kd_mask
-                    )
-                else:
-                    lkd = self.lkd * self.lkd_loss(
-                        outputs * temp_mask, outputs_old * temp_mask, mask=kd_mask
-                    )
-
-                if self.kd_new:  # WTF?
-                    mask_bg = labels == 0
-                    lkd = lkd[mask_bg]
-
-                if kd_mask is not None and self.kd_mask_adaptative_factor:
-                    lkd = lkd.mean(dim=(1, 2)) * kd_mask.float().mean(dim=(1, 2))
-                lkd = torch.mean(lkd)
-
-            if self.pod is not None and self.step > 0:
-                attentions_old = features_old["attentions"]
-                attentions_new = features["attentions"]
-
-                if self.pod_logits:
-                    attentions_old.append(features_old["sem_logits_small"])
-                    attentions_new.append(features["sem_logits_small"])
-                elif self.pod_large_logits:
-                    attentions_old.append(outputs_old)
-                    attentions_new.append(outputs)
-
-                pod_loss = features_distillation(
-                    attentions_old,
-                    attentions_new,
-                    collapse_channels=self.pod,
-                    labels=labels,
-                    index_new_class=self.old_classes,
-                    pod_apply=self.pod_apply,
-                    pod_deeplab_mask=self.pod_deeplab_mask,
-                    pod_deeplab_mask_factor=self.pod_deeplab_mask_factor,
-                    interpolate_last=self.pod_interpolate_last,
-                    pod_factor=self.pod_factor,
-                    prepro=self.pod_prepro,
-                    deeplabmask_upscale=not self.deeplab_mask_downscale,
-                    spp_scales=self.spp_scales,
-                    pod_options=self.pod_options,
-                    outputs_old=outputs_old,
-                    use_pod_schedule=self.use_pod_schedule,
-                    nb_current_classes=self.nb_current_classes,
-                    nb_new_classes=self.nb_new_classes
-                )
-
-            if self.entropy_min > 0. and self.step > 0:
-                mask_new = labels > 0
-                entropies = entropy(torch.softmax(outputs, dim=1))
-                entropies[mask_new] = 0.
-                pixel_amount = (~mask_new).float().sum(dim=(1, 2))
-                loss_entmin = (entropies.sum(dim=(1, 2)) / pixel_amount).mean()
-
-            if self.kd_scheduling:
-                lkd = lkd * math.sqrt(self.nb_current_classes / self.nb_new_classes)
-
-            # xxx first backprop of previous loss (compute the gradients for regularization methods)
-            loss_tot = loss + lkd + lde + l_icarl + pod_loss + loss_entmin
-
-            with amp.scale_loss(loss_tot, optim) as scaled_loss:
-                scaled_loss.backward()
-
-            # xxx Regularizer (EWC, RW, PI)
-            if self.regularizer_flag:
-                if distributed.get_rank() == 0:
-                    self.regularizer.update()
-                l_reg = self.reg_importance * self.regularizer.penalty()
-                if l_reg != 0.:
-                    with amp.scale_loss(l_reg, optim) as scaled_loss:
-                        scaled_loss.backward()
-
-            optim.step()
+                optim.step()
             if scheduler is not None:
                 scheduler.step()
 ####################################################################################################################################################################
             epoch_loss += loss.item()
-            reg_loss += l_reg.item() if l_reg != 0. else 0.
-            reg_loss += lkd.item() + lde.item() + l_icarl.item()
-            interval_loss += loss.item() + lkd.item() + lde.item() + l_icarl.item() + pod_loss.item(
-            ) + loss_entmin.item()
-            interval_loss += l_reg.item() if l_reg != 0. else 0.
+            reg_loss += 0 #l_reg.item() if l_reg != 0. else 0.
+            reg_loss += 0 #lkd.item() + lde.item() + l_icarl.item()
+            interval_loss += loss.item() #+ lkd.item() + lde.item() + l_icarl.item() + pod_loss.item(
+            # ) + loss_entmin.item()
+            # interval_loss += l_reg.item() if l_reg != 0. else 0.
 
             if (cur_step + 1) % print_int == 0:
                 interval_loss = interval_loss / print_int
@@ -482,7 +250,7 @@ class Trainer:
                     f" Loss={interval_loss}"
                 )
                 logger.info(
-                    f"Loss made of: CE {loss}, LKD {lkd}, LDE {lde}, LReg {l_reg}, POD {pod_loss} EntMin {loss_entmin}"
+                    f"Loss made of: CE {loss}"#, LKD {lkd}, LDE {lde}, LReg {l_reg}, POD {pod_loss} EntMin {loss_entmin}"
                 )
                 # visualization
                 if logger is not None:

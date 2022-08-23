@@ -18,7 +18,7 @@ from dataset import (AdeSegmentationIncremental,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
 from segmentation_module import make_model
-from train import Trainer
+from simple_train import Trainer
 from utils.logger import Logger
 
 
