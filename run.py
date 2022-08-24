@@ -306,7 +306,7 @@ def run_step(opts, world_size, rank, device):
         if opts.step_ckpt is not None:
             path = opts.step_ckpt
         else:
-            path = f"{opts.checkpoint}/{task_name}_{opts.name}_{opts.step - 1}.pth"
+            path = f"{opts.checkpoint}/{opts.name}.pth"
 
         # generate model from path
         if os.path.exists(path):
@@ -361,6 +361,7 @@ def run_step(opts, world_size, rank, device):
     # xxx Handle checkpoint for current model (model old will always be as previous step or None)
     best_score = 0.0
     if opts.ckpt is not None and os.path.isfile(opts.ckpt):
+        print("\n\n...Loading from checkpoint..\n\n")
         checkpoint = torch.load(opts.ckpt, map_location="cpu")
         model.load_state_dict(checkpoint["model_state"], strict=opts.strict_weights)
         optimizer.load_state_dict(checkpoint["optimizer_state"])
@@ -394,7 +395,8 @@ def run_step(opts, world_size, rank, device):
     )  # de-normalization for original images
 
     TRAIN = not opts.test
-    if opts.dataset == "cityscapes_domain":
+    print("TRAIN is ", TRAIN)
+    if opts.dataset in ["cityscapes_domain", "acdc"]:
         val_metrics = StreamSegMetrics(opts.num_classes)
     else:
         val_metrics = StreamSegMetrics(n_classes)
@@ -453,7 +455,7 @@ def run_step(opts, world_size, rank, device):
                     score = val_score['Mean IoU']
                     # best model to build incremental steps
                     save_ckpt(
-                        f"{opts.checkpoint}/{task_name}_{opts.name}_{opts.step}.pth", model,
+                        f"{opts.checkpoint}/{opts.name}.pth", model,
                         trainer, optimizer, scheduler, cur_epoch, score
                     )
                     logger.info("[!] Checkpoint saved.")
@@ -485,7 +487,7 @@ def run_step(opts, world_size, rank, device):
     if rank == 0 and TRAIN:  # save best model at the last iteration
         # best model to build incremental steps
         save_ckpt(
-            f"{opts.checkpoint}/{task_name}_{opts.name}_{opts.step}.pth", model, trainer, optimizer,
+            f"{opts.checkpoint}/{opts.name}.pth", model, trainer, optimizer,
             scheduler, cur_epoch, best_score
         )
         logger.info("[!] Checkpoint saved.")
@@ -503,7 +505,7 @@ def run_step(opts, world_size, rank, device):
     )
 
     # load best model
-    if True: #TRAIN:
+    if TRAIN:
         # Always reloading model for now
         # https://github.com/arthurdouillard/CVPR2021_PLOP/issues/3
         model = make_model(
@@ -511,7 +513,8 @@ def run_step(opts, world_size, rank, device):
         )
         # Put the model on GPU
         model = DistributedDataParallel(model.cuda(device))
-        ckpt = f"{opts.checkpoint}/{task_name}_{opts.name}_{opts.step}.pth"
+        # ckpt = f"{opts.checkpoint}/{task_name}_{opts.name}_{opts.step}.pth"
+        ckpt = f"{opts.checkpoint}/{opts.name}.pth"
         checkpoint = torch.load(ckpt, map_location="cpu")
         model.load_state_dict(checkpoint["model_state"])
         logger.info(f"*** Model restored from {ckpt}")
