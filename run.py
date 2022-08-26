@@ -361,18 +361,19 @@ def run_step(opts, world_size, rank, device):
     # xxx Handle checkpoint for current model (model old will always be as previous step or None)
     best_score = 0.0
     if opts.ckpt is not None and os.path.isfile(opts.ckpt):
-        print("\n\n...Loading from checkpoint..\n\n")
+        # print("\n\n...Loading from checkpoint..\n\n")
+        logger.info("\n\n...Loading from checkpoint..\n\n")
         checkpoint = torch.load(opts.ckpt, map_location="cpu")
         model.load_state_dict(checkpoint["model_state"], strict=opts.strict_weights)
-        optimizer.load_state_dict(checkpoint["optimizer_state"])
-        scheduler.load_state_dict(checkpoint["scheduler_state"])
-        cur_epoch = checkpoint["epoch"] + 1
-        best_score = checkpoint['best_score']
+        # optimizer.load_state_dict(checkpoint["optimizer_state"])
+        # scheduler.load_state_dict(checkpoint["scheduler_state"])
+        # cur_epoch = checkpoint["epoch"] + 1
+        # best_score = checkpoint['best_score']
         logger.info("[!] Model restored from %s" % opts.ckpt)
         # if we want to resume training, resume trainer from checkpoint
-        if 'trainer_state' in checkpoint:
-            trainer.load_state_dict(checkpoint['trainer_state'])
-        del checkpoint
+        # if 'trainer_state' in checkpoint:
+            # trainer.load_state_dict(checkpoint['trainer_state'])
+        # del checkpoint
     else:
         if opts.step == 0:
             logger.info("[!] Train from scratch")
@@ -395,7 +396,7 @@ def run_step(opts, world_size, rank, device):
     )  # de-normalization for original images
 
     TRAIN = not opts.test
-    print("TRAIN is ", TRAIN)
+    logger.info("TRAIN is {}".format(TRAIN))
     if opts.dataset in ["cityscapes_domain", "acdc"]:
         val_metrics = StreamSegMetrics(opts.num_classes)
     else:
@@ -410,6 +411,7 @@ def run_step(opts, world_size, rank, device):
         trainer.before(train_loader=train_loader, logger=logger)
 
         for cur_epoch in range(opts.epochs):
+            logger.info("\nTraining ...\n")
             # =====  Train  =====
             model.train()
 
