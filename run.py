@@ -14,7 +14,7 @@ import argparser
 import tasks
 import utils
 from dataset import (AdeSegmentationIncremental, ACDC_Incremental,
-                     CityscapesSegmentationIncrementalDomain,
+                     CityscapesSegmentationIncrementalDomain, CARLA_Incremental,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
 from segmentation_module import make_model
@@ -77,6 +77,8 @@ def get_dataset(opts):
         dataset = CityscapesSegmentationIncrementalDomain
     elif opts.dataset == 'acdc':
         dataset = ACDC_Incremental
+    elif opts.dataset == 'carla':
+        dataset = CARLA_Incremental
     else:
         raise NotImplementedError
 
@@ -137,6 +139,7 @@ def get_dataset(opts):
 
 
 def main(opts):
+    
     distributed.init_process_group(backend='nccl', init_method='env://')
     device_id, device = opts.local_rank, torch.device(opts.local_rank)
     rank, world_size = distributed.get_rank(), distributed.get_world_size()
@@ -193,7 +196,7 @@ def run_step(opts, world_size, rank, device):
     train_dst, val_dst, test_dst, n_classes = get_dataset(opts)
     # reset the seed, this revert changes in random seed
     random.seed(opts.random_seed)
-
+    
     train_loader = data.DataLoader(
         train_dst,
         batch_size=opts.batch_size,
@@ -215,7 +218,8 @@ def run_step(opts, world_size, rank, device):
 
     # xxx Set up model
     logger.info(f"Backbone: {opts.backbone}")
-
+    # print("opts.dataset is ", opts.dataset)
+    # print(opts.dataset, opts.task, opts.step)
     opts.inital_nb_classes = tasks.get_per_task_classes(opts.dataset, opts.task, opts.step)[0]
 
     step_checkpoint = None
@@ -397,7 +401,7 @@ def run_step(opts, world_size, rank, device):
 
     TRAIN = not opts.test
     logger.info("TRAIN is {}".format(TRAIN))
-    if opts.dataset in ["cityscapes_domain", "acdc"]:
+    if opts.dataset in ["cityscapes_domain", "acdc", "carla"]:
         val_metrics = StreamSegMetrics(opts.num_classes)
     else:
         val_metrics = StreamSegMetrics(n_classes)

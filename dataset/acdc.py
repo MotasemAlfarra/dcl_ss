@@ -156,7 +156,8 @@ class ACDC_Incremental(data.Dataset):
         else:
             idxs = idxs[train_len:]
             print(f"{len(idxs)} images for val")
-
+        # import pdb
+        # pdb.set_trace()
         target_transform = tv.transforms.Lambda(
             lambda t: t.
             apply_(lambda x: id_to_trainid.get(x, 255))

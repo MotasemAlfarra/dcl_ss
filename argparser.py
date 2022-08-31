@@ -17,6 +17,8 @@ def modify_command_options(opts):
         opts.num_classes = 19
     elif opts.dataset == "acdc":
         opts.num_classes = 19
+    elif opts.dataset =="carla":
+        opts.num_classes = 23
     else:
         raise NotImplementedError(f"Unknown dataset: {opts.dataset}")
 
@@ -80,7 +82,7 @@ def get_argparser():
         "--dataset",
         type=str,
         default='voc',
-        choices=['voc', 'ade', 'cityscapes_domain', 'acdc'],
+        choices=['voc', 'ade', 'cityscapes_domain', 'acdc', 'carla'],
         help='Name of dataset'
     )
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
