@@ -198,10 +198,13 @@ class Trainer:
         sample_weights = None
 
         train_loader.sampler.set_epoch(cur_epoch)
-
+        random_number = 0
         model.train()
         print('self.numeber of internal steps is:', self.num_internal_steps)
         for cur_step, (images, labels) in enumerate(train_loader):
+            # random_number += 1
+            # if random_number > 10:
+            #     break
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
             
@@ -397,7 +400,8 @@ class Trainer:
                         outputs_old, features_old = self.model_old(images, ret_intermediate=True)
 
                 outputs, features = model(images, ret_intermediate=True)
-
+                # print("Changing the output to labels")
+                # outputs = labels
                 # xxx BCE / Cross Entropy Loss
                 if not self.icarl_only_dist:
                     loss = criterion(outputs, labels)  # B x H x W
@@ -434,6 +438,7 @@ class Trainer:
                 labels = labels.cpu().numpy()
                 prediction = prediction.cpu().numpy()
                 metrics.update(labels, prediction)
+                # metrics.update(labels, labels)
 
                 if ret_samples_ids is not None and i in ret_samples_ids:  # get samples
                     ret_samples.append((images[0].detach().cpu().numpy(), labels[0], prediction[0]))
