@@ -89,7 +89,9 @@ def get_argparser():
     # parser.add_argument(
     #     "--dont_predict_bg", action="store_true", default=False, help="Useful for cityscapes"
     # )
-
+    parser.add_argument(    
+        "--use_carla", default=False, action='store_true', help="Whether to include carla during training (default: no)"
+    )
     # Method Options
     # BE CAREFUL USING THIS, THEY WILL OVERRIDE ALL THE OTHER PARAMETERS.
     parser.add_argument(
