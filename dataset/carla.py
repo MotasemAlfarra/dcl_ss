@@ -77,7 +77,7 @@ class CARLA(data.Dataset):
                 path.replace('seg', 'rgb').replace('tif', 'jpg'), path
                 # path, path.replace('rgb', 'seg').replace('jpg', 'tif')
                 ,
-                1 # weather_conditions[path.split("/")[-4]]
+                1 # this usually represents a domain index. However, we do not need it
             ) for path in sorted(glob.glob(os.path.join(rgb_paths, "*/*.tif")))
         ]
         print("Original number of image label paths is {}".format(len(self.images)))
