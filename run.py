@@ -147,6 +147,7 @@ def get_dataset(opts):
             train=True,
             transform=train_transform,
             labels=list(labels),
+            skip = opts.skip,
             labels_old=list(labels_old),
             idxs_path=path_base + f"/train-{opts.step}.npy",
             masking=not opts.no_mask,

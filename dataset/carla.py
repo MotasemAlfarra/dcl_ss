@@ -61,7 +61,7 @@ BASE_PATH = "/export/share/datasets/Carla_Dynamic/Town10_720p_V1/car_view/data/*
 # out_recording_rgb_cam9_1280_720/*/*.jpg
 class CARLA(data.Dataset):
 
-    def __init__(self, root='', train=True, transform=None, domain_transform=None):
+    def __init__(self, root='', train=True, transform=None, domain_transform=None, skip=100):
         # root = os.path.expanduser(root)
         self.transform = transform
         self.domain_transform = domain_transform
@@ -91,7 +91,7 @@ class CARLA(data.Dataset):
             self.clean_data()
         
         print("number of paths where there exists images AND labels are {}".format(len(self.images)))
-        self.images = [self.images[i] for i in range(0, len(self.images), 100)]
+        self.images = [self.images[i] for i in range(0, len(self.images), skip)]
         
     def clean_data(self):
         from tqdm import tqdm
@@ -157,6 +157,7 @@ class CARLA_Incremental(data.Dataset):
         train=True,
         transform=None,
         labels=range(23), #For evaluation on CityScapes
+        skip=100,
         idxs_path=None,
         masking=True,
         overlap=True,
@@ -164,7 +165,7 @@ class CARLA_Incremental(data.Dataset):
         **kwargs
     ):
 
-        full_data = CARLA(root, train)
+        full_data = CARLA(root, train, skip=skip)
         idxs = filter_images(full_data, labels)
         if idxs_path is not None and distributed.get_rank() == 0:
             np.save(idxs_path, np.array(idxs, dtype=int))
