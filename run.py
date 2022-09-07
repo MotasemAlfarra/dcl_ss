@@ -159,6 +159,25 @@ def get_dataset(opts):
         )
         train_dst = torch.utils.data.ConcatDataset([train_dst, carla_train_dst])
 
+    if opts.use_acdc:
+        print("using acdc")
+        acdc = ACDC_Incremental
+        acdc_train_dst = acdc(
+            root='/home/malfarra/acdc',
+            train=True,
+            transform=train_transform,
+            labels=list(labels),
+            labels_old=list(labels_old),
+            idxs_path=path_base + f"/train-{opts.step}.npy",
+            masking=not opts.no_mask,
+            overlap=opts.overlap,
+            disable_background=opts.disable_background,
+            data_masking=opts.data_masking,
+            test_on_val=opts.test_on_val,
+            step=opts.step
+        )
+        train_dst = torch.utils.data.ConcatDataset([train_dst, acdc_train_dst])
+
     return train_dst, val_dst, test_dst, len(labels_cum)
 
 
@@ -224,7 +243,7 @@ def run_step(opts, world_size, rank, device):
     train_loader = data.DataLoader(
         train_dst,
         batch_size=opts.batch_size,
-        sampler=DistributedSampler(train_dst, num_replicas=world_size, rank=rank),
+        sampler=DistributedSampler(train_dst, shuffle=True),#, num_replicas=world_size, rank=rank),
         num_workers=opts.num_workers,
         drop_last=True
     )
