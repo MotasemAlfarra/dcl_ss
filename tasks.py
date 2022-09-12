@@ -152,7 +152,7 @@ tasks_acdc_domain = {
 }
 
 tasks_carla_domain = {
-    "offline": {0: list(range(23))}
+    "offline": {0: list(range(19))}
 }
 
 tasks_cityscapes_domain = {
