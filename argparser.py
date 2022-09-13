@@ -18,7 +18,7 @@ def modify_command_options(opts):
     elif opts.dataset == "acdc":
         opts.num_classes = 19
     elif opts.dataset =="carla":
-        opts.num_classes = 23
+        opts.num_classes = 19
     else:
         raise NotImplementedError(f"Unknown dataset: {opts.dataset}")
 

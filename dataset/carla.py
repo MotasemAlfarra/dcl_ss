@@ -156,8 +156,8 @@ class CARLA_Incremental(data.Dataset):
         root,
         train=True,
         transform=None,
-        labels=range(23), #For evaluation on CityScapes
-        skip=100,
+        labels=range(19), #For evaluation on CityScapes
+        skip=50,
         idxs_path=None,
         masking=True,
         overlap=True,
