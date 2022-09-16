@@ -1,3 +1,4 @@
+from copy import deepcopy
 # mapping from carla classes to cityscapes
 # carla_classes_to_cityscapes = {
 #     0: 255,  # 'unlabeled': 0,
@@ -92,8 +93,8 @@ def transform_CARLA_Segmentation_mask_to_CityScapes_Segmentation_mask(segmentati
     This functions recieves CARLA segmentation mask
     and returns the segmentation map in CityScapes format
     '''
-    
+    transformed_mask = deepcopy(segmentation_mask)
     for i in carla_classes_to_cityscapes.keys():
-        segmentation_mask[segmentation_mask == i] = carla_classes_to_cityscapes[i]
+        transformed_mask[segmentation_mask == i] = carla_classes_to_cityscapes[i]
 
-    return segmentation_mask
+    return transformed_mask
