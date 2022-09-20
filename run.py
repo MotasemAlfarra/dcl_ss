@@ -194,7 +194,7 @@ def main(opts):
     if len(opts.lr) == 1 and len(opts.step) > 1:
         opts.lr = opts.lr * len(opts.step)
 
-    os.makedirs("results", exist_ok=True)
+    os.makedirs("results/" + opts.dir_name, exist_ok=True)
 
     print(f"Learning for {len(opts.step)} with lrs={opts.lr}.")
     all_val_scores = []
@@ -212,7 +212,7 @@ def main(opts):
         torch.cuda.empty_cache()
 
         if rank == 0:
-            with open(f"results/{opts.date}_{opts.dataset}_{opts.task}_{opts.name}.csv", "a+") as f:
+            with open(f"results/{opts.dir_name}/{opts.name}.csv", "a+") as f:
                 classes_iou = ','.join(
                     [str(val_score['Class IoU'].get(c, 'x')) for c in range(opts.num_classes)]
                 )

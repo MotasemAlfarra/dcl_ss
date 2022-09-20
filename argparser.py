@@ -188,6 +188,12 @@ def get_argparser():
         help="name of the experiment - to append to log directory (default: Experiment)"
     )
     parser.add_argument(
+        "--dir_name",
+        type=str,
+        default='Experiment',
+        help="name of the directory to save the results at"
+    )
+    parser.add_argument(
         "--sample_num",
         type=int,
         default=0,
