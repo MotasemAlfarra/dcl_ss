@@ -62,19 +62,31 @@ city_to_id = {
 }
 
 
+# def filter_images(dataset, labels):
+#     # Filter images without any label in LABELS (using labels not reordered)
+#     idxs = []
+
+#     print(f"Filtering images...")
+#     for i in range(len(dataset)):
+#         domain_id = dataset.__getitem__(i, get_domain=True)  # taking domain id
+#         if domain_id in labels:
+#             idxs.append(i)
+#         if i % 1000 == 0:
+#             print(f"\t{i}/{len(dataset)} ...")
+#     return idxs
 def filter_images(dataset, labels):
-    # Filter images without any label in LABELS (using labels not reordered)
+    # This just returns the set of all indices
     idxs = []
 
     print(f"Filtering images...")
     for i in range(len(dataset)):
-        domain_id = dataset.__getitem__(i, get_domain=True)  # taking domain id
-        if domain_id in labels:
-            idxs.append(i)
-        if i % 1000 == 0:
-            print(f"\t{i}/{len(dataset)} ...")
+        idxs.append(i)
+        # domain_id = dataset.__getitem__(i, get_domain=True)  # taking domain id
+        # if domain_id in labels:
+        #     idxs.append(i)
+        # if i % 1000 == 0:
+        #     print(f"\t{i}/{len(dataset)} ...")
     return idxs
-
 
 class CityscapesSegmentationDomain(data.Dataset):
 
@@ -155,12 +167,12 @@ class CityscapesSegmentationIncrementalDomain(data.Dataset):
         full_data = CityscapesSegmentationDomain(root, train)
 
         # take index of images with at least one class in labels and all classes in labels+labels_old+[255]
-        if idxs_path is not None and os.path.exists(idxs_path):
-            idxs = np.load(idxs_path).tolist()
-        else:
-            idxs = filter_images(full_data, labels)
-            if idxs_path is not None and distributed.get_rank() == 0:
-                np.save(idxs_path, np.array(idxs, dtype=int))
+        # if idxs_path is not None and os.path.exists(idxs_path):
+        #     idxs = np.load(idxs_path).tolist()
+        # else:
+        idxs = filter_images(full_data, labels)
+        if idxs_path is not None and distributed.get_rank() == 0:
+            np.save(idxs_path, np.array(idxs, dtype=int))
 
         rnd = np.random.RandomState(1)
         rnd.shuffle(idxs)
