@@ -15,7 +15,7 @@ import tasks
 import utils
 from dataset import (AdeSegmentationIncremental, ACDC_Incremental,
                      CityscapesSegmentationIncrementalDomain, CARLA_Incremental,
-                     BDD100K_Incremental,
+                     BDD100K_Incremental, IDD_Incremental,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
 from segmentation_module import make_model
@@ -84,6 +84,8 @@ def get_dataset(opts):
         dataset = CARLA_Incremental
     elif opts.dataset == 'bdd100k':
         dataset = BDD100K_Incremental
+    elif opts.dataset == 'idd':
+        dataset = IDD_Incremental
     else:
         raise NotImplementedError
 
@@ -447,7 +449,7 @@ def run_step(opts, world_size, rank, device):
 
     TRAIN = not opts.test
     logger.info("TRAIN is {}".format(TRAIN))
-    if opts.dataset in ["cityscapes_domain", "acdc", "carla", "bdd100k"]:
+    if opts.dataset in ["cityscapes_domain", "acdc", "carla", "bdd100k", "idd"]:
         val_metrics = StreamSegMetrics(opts.num_classes)
     else:
         val_metrics = StreamSegMetrics(n_classes)
