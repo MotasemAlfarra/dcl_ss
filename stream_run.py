@@ -176,7 +176,8 @@ def get_dataset(opts):
             step=opts.step
         )
         train_dst = torch.utils.data.ConcatDataset([train_dst, carla_train_dst])
-
+        logger.info("\n\n The total number of images in training set after adding CARLA is {} and on the val set is {} and for test set is {}".format(
+                                                len(train_dst), len(val_dst), len(test_dst)))
     return train_dst, val_dst, test_dst, len(labels_cum)
 
 
