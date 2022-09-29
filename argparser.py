@@ -23,6 +23,8 @@ def modify_command_options(opts):
         opts.num_classes = 19
     elif opts.dataset =="idd":
         opts.num_classes = 19
+    elif opts.dataset =="viper":
+        opts.num_classes = 19
     else:
         raise NotImplementedError(f"Unknown dataset: {opts.dataset}")
 
@@ -86,7 +88,7 @@ def get_argparser():
         "--dataset",
         type=str,
         default='voc',
-        choices=['voc', 'ade', 'cityscapes_domain', 'acdc', 'carla', 'bdd100k', 'idd'],
+        choices=['voc', 'ade', 'cityscapes_domain', 'acdc', 'carla', 'bdd100k', 'idd', 'viper'],
         help='Name of dataset'
     )
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
@@ -95,6 +97,9 @@ def get_argparser():
     # )
     parser.add_argument(    
         "--use_carla", default=False, action='store_true', help="Whether to include carla during training (default: no)"
+    )
+    parser.add_argument(    
+        "--use_viper", default=False, action='store_true', help="Whether to include viper during training (default: no)"
     )
     parser.add_argument(    
         "--use_acdc", default=False, action='store_true', help="include acdc in the training"

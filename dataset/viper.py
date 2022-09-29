@@ -7,11 +7,12 @@ import torchvision as tv
 from PIL import Image
 from torch import distributed
 from .utils import Subset
+from .map_viper_to_cs import convert_viper_to_cs as transform_mask
 
 BASE_PATH = '/export/share/datasets/VIPER/'
 class VIPER(data.Dataset):
 
-    def __init__(self, root='./', train=True, transform=None, domain_transform=None):
+    def __init__(self, root='./', train=True, transform=None, domain_transform=None, skip=100):
         # root = os.path.expanduser(root)
         train_folder = os.path.join(BASE_PATH, 'train')
         val_folder = os.path.join(BASE_PATH, 'val')
@@ -31,6 +32,7 @@ class VIPER(data.Dataset):
             ) for path in sorted(glob.glob(os.path.join(val_folder, "img/*/*.jpg")))
         ]
         self.images = [self.images[i] for i in range(0, len(self.images), 10)]# This is to skip frames
+        self.images = [self.images[i] for i in range(0, len(self.images), skip)]# This is to skip frames
         self.transform = transform
         self.domain_transform = domain_transform
 
@@ -50,8 +52,8 @@ class VIPER(data.Dataset):
         try:
             img = Image.open(self.images[index][0]).convert('RGB')
             target = Image.open(self.images[index][1])
-            # target = transform_mask(np.asarray(target))
-            # target = Image.fromarray(target)
+            target = transform_mask(np.asarray(target))
+            target = Image.fromarray(target)
         except Exception as e:
             raise Exception(f"Index: {index}, len: {len(self)}, message: {str(e)}")
 
@@ -72,13 +74,14 @@ class VIPER_Incremental(data.Dataset):
         train=True,
         transform=None,
         labels=range(19),
+        skip=50,
         idxs_path=None,
         masking=True,
         overlap=True,
         **kwargs
     ):
 
-        full_data = VIPER(root, train)
+        full_data = VIPER(root, train, skip=skip)
         # print('length', len(full_data))
         # if idxs_path is not None and os.path.exists(idxs_path):
         #     idxs = np.load(idxs_path).tolist()
@@ -90,12 +93,13 @@ class VIPER_Incremental(data.Dataset):
 
         rnd = np.random.RandomState(1)
         rnd.shuffle(idxs)
-        train_len = int(0.8 * len(idxs))
+        train_len = int(1.0 * len(idxs))
+        eval_len = int(0.1 * len(idxs))
         if train:
             idxs = idxs[:train_len]
             print(f"{len(idxs)} images for train")
         else:
-            idxs = idxs[train_len:]
+            idxs = idxs[:eval_len]
             print(f"{len(idxs)} images for val")
         # import pdb
         # pdb.set_trace()

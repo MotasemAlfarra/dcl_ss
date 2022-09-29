@@ -91,6 +91,7 @@ class CARLA(data.Dataset):
             self.clean_data()
         
         print("number of paths where there exists images AND labels are {}".format(len(self.images)))
+        self.images = [self.images[i] for i in range(0, len(self.images), 10)]# This is to skip frames
         self.images = [self.images[i] for i in range(0, len(self.images), skip)]
         
     def clean_data(self):
@@ -172,14 +173,14 @@ class CARLA_Incremental(data.Dataset):
 
         rnd = np.random.RandomState(1)
         rnd.shuffle(idxs)
-        train_len = int(0.8 * len(idxs))
-        # val_len = int(0.1*len(idxs))
+        train_len = int(1.0 * len(idxs))
+        val_len = int(0.1*len(idxs))
         if train:
             idxs = idxs[:train_len]
             print(f"{len(idxs)} images for train")
         else:
-            # idxs = idxs[:val_len]
-            idxs = idxs[train_len:]
+            idxs = idxs[:val_len]
+            # idxs = idxs[train_len:]
             print(f"{len(idxs)} images for val")
 
         target_transform = tv.transforms.Lambda(

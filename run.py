@@ -15,7 +15,7 @@ import tasks
 import utils
 from dataset import (AdeSegmentationIncremental, ACDC_Incremental,
                      CityscapesSegmentationIncrementalDomain, CARLA_Incremental,
-                     BDD100K_Incremental, IDD_Incremental,
+                     BDD100K_Incremental, IDD_Incremental, VIPER, VIPER_Incremental,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
 from segmentation_module import make_model
@@ -86,6 +86,8 @@ def get_dataset(opts):
         dataset = BDD100K_Incremental
     elif opts.dataset == 'idd':
         dataset = IDD_Incremental
+    elif opts.dataset == 'viper':
+        dataset = VIPER_Incremental
     else:
         raise NotImplementedError
 
@@ -143,8 +145,9 @@ def get_dataset(opts):
         step=opts.step,
         ignore_test_bg=opts.ignore_test_bg
     )
-
+    num_images = len(train_dst)
     if opts.use_carla:
+        actual_skip = round(opts.skip*18178/(num_images))
         print("using carla")
         carla = CARLA_Incremental
         carla_train_dst = carla(
@@ -152,7 +155,7 @@ def get_dataset(opts):
             train=True,
             transform=train_transform,
             labels=list(labels),
-            skip = opts.skip,
+            skip = actual_skip,#opts.skip,
             labels_old=list(labels_old),
             idxs_path=path_base + f"/train-{opts.step}.npy",
             masking=not opts.no_mask,
@@ -163,15 +166,18 @@ def get_dataset(opts):
             step=opts.step
         )
         train_dst = torch.utils.data.ConcatDataset([train_dst, carla_train_dst])
-
-    if opts.use_acdc:
-        print("using acdc")
-        acdc = ACDC_Incremental
-        acdc_train_dst = acdc(
-            root='/home/malfarra/acdc',
+        print("\n\n The total number of images in training set after adding CARLA is {}".format(
+                                                len(train_dst)))
+    if opts.use_viper:
+        actual_skip = round(opts.skip*18392/(num_images))
+        print("using viper")
+        viper = VIPER_Incremental
+        viper_train_dst = viper(
+            root=opts.data_root,
             train=True,
             transform=train_transform,
             labels=list(labels),
+            skip = actual_skip,#opts.skip,
             labels_old=list(labels_old),
             idxs_path=path_base + f"/train-{opts.step}.npy",
             masking=not opts.no_mask,
@@ -181,7 +187,27 @@ def get_dataset(opts):
             test_on_val=opts.test_on_val,
             step=opts.step
         )
-        train_dst = torch.utils.data.ConcatDataset([train_dst, acdc_train_dst])
+        train_dst = torch.utils.data.ConcatDataset([train_dst, viper_train_dst])
+        print("\n\n The total number of images in training set after adding VIPER is {}".format(
+                                                len(train_dst)))
+    # if opts.use_acdc:
+    #     print("using acdc")
+    #     acdc = ACDC_Incremental
+    #     acdc_train_dst = acdc(
+    #         root='/home/malfarra/acdc',
+    #         train=True,
+    #         transform=train_transform,
+    #         labels=list(labels),
+    #         labels_old=list(labels_old),
+    #         idxs_path=path_base + f"/train-{opts.step}.npy",
+    #         masking=not opts.no_mask,
+    #         overlap=opts.overlap,
+    #         disable_background=opts.disable_background,
+    #         data_masking=opts.data_masking,
+    #         test_on_val=opts.test_on_val,
+    #         step=opts.step
+    #     )
+    #     train_dst = torch.utils.data.ConcatDataset([train_dst, acdc_train_dst])
 
     return train_dst, val_dst, test_dst, len(labels_cum)
 
@@ -449,7 +475,7 @@ def run_step(opts, world_size, rank, device):
 
     TRAIN = not opts.test
     logger.info("TRAIN is {}".format(TRAIN))
-    if opts.dataset in ["cityscapes_domain", "acdc", "carla", "bdd100k", "idd"]:
+    if opts.dataset in ["cityscapes_domain", "acdc", "carla", "bdd100k", "idd", "viper"]:
         val_metrics = StreamSegMetrics(opts.num_classes)
     else:
         val_metrics = StreamSegMetrics(n_classes)

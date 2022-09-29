@@ -161,8 +161,11 @@ tasks_bdd100k_domain = {
 tasks_idd_domain = {
     "offline": {0: list(range(19))}
 }
+tasks_viper_domain = {
+    "offline": {0: list(range(19))}
+}
 tasks_cityscapes_domain = {
-    "offline": {0: list(range(21))},
+    "offline": {0: list(range(19))},
     "11-5":
         {
             0: list(range(11)),
@@ -246,6 +249,8 @@ def get_task_labels(dataset, name, step):
         task_dict = tasks_bdd100k_domain[name]
     elif dataset =='idd':
         task_dict = tasks_idd_domain[name]
+    elif dataset =='viper':
+        task_dict = tasks_viper_domain[name]
     else:
         raise NotImplementedError
     assert step in task_dict.keys(), f"You should provide a valid step! [{step} is out of range]"
@@ -270,6 +275,8 @@ def get_per_task_classes(dataset, name, step):
         task_dict = tasks_bdd100k_domain[name]
     elif dataset == 'idd':
         task_dict = tasks_idd_domain[name]
+    elif dataset == 'viper':
+        task_dict = tasks_viper_domain[name]
         # print("CARLA is Checked!")
     else:
         raise NotImplementedError
