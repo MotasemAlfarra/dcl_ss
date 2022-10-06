@@ -335,7 +335,37 @@ def get_argparser():
         default=10,
         help="If RW, the number of iterations after each the update of the score is done"
     )
-
+    parser.add_argument(
+        "--regularizer_new",
+        default=None,
+        type=str,
+        choices=['ewc', 'rw', 'pi'],
+        help="regularizer you want to use. Default is None"
+    )
+    parser.add_argument(
+        "--reg_importance_new",
+        type=float,
+        default=1.,
+        help="set this par to a value greater than 0 to enable regularization"
+    )
+    parser.add_argument(
+        "--reg_alpha_new",
+        type=float,
+        default=0.9,
+        help="Hyperparameter for RW and EWC that controls the update of Fisher Matrix"
+    )
+    parser.add_argument(
+        "--fisher_save_path",
+        default=None,
+        type=str,
+        help="path to save fisher matrix for ewc"
+    )
+    parser.add_argument(
+        "--fisher_load_path",
+        default=None,
+        type=str,
+        help="path to load fisher matrix for ewc"
+    )
     # Arguments for ICaRL (from https://arxiv.org/abs/1611.07725)
     parser.add_argument(
         "--icarl", default=False, action='store_true', help="If enable ICaRL or not (def is not)"
