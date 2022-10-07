@@ -202,9 +202,9 @@ class Trainer:
         model.train()
         print('self.numeber of internal steps is:', self.num_internal_steps)
         for cur_step, (images, labels) in enumerate(train_loader):
-            random_number += 1
-            if random_number > 10:
-                break
+            # random_number += 1
+            # if random_number > 10:
+            #     break
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
             
@@ -273,7 +273,7 @@ class Trainer:
         if reg is not None:
             reg.update(model, images, labels)
             if distributed.get_rank() == 0:
-                print('fisher is updated, now we are saving this shit!')    
+                print('fisher is updated, now we are saving it!')    
                 reg.save_fisher(save_path)
         # collect statistics from multiple processes
         epoch_loss = torch.tensor(epoch_loss).to(self.device)
