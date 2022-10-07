@@ -466,9 +466,15 @@ def run_step(opts, world_size, rank, device):
     logger.print(torch.randint(0, 100, (1, 1)))
     # train/val here
     if opts.regularizer_new is not None:
-        print("\n Initializing the regularizer to EWC\n")
+        print("\n Initializing the regularizer to ", opts.regularizer_new)
         from utils.ewc import EWC
-        regularizer = EWC(model, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
+        from utils.mas import MAS
+        regularizers = {
+        "ewc": EWC,
+        "mas": MAS
+        }
+        method = regularizers[opts.regularizer_new]
+        regularizer = method(model, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
         if opts.fisher_load_path is not None:
             print("\n Loading Fisher matrix from saved data\n")
             regularizer.load_fisher(opts.fisher_load_path)
