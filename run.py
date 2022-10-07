@@ -460,6 +460,24 @@ def run_step(opts, world_size, rank, device):
     # print opts before starting training to log all parameters
     logger.add_table("Opts", vars(opts))
 
+
+    if opts.regularizer_new is not None:
+        print("\n Initializing the regularizer to ", opts.regularizer_new)
+        from utils.ewc import EWC
+        from utils.mas import MAS
+        regularizers = {
+        "ewc": EWC,
+        "mas": MAS
+        }
+        method = regularizers[opts.regularizer_new]
+        regularizer = method(model, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
+        if opts.fisher_load_path is not None:
+            print("\n Loading Fisher matrix from saved data\n")
+            regularizer.load_fisher(opts.fisher_load_path)
+    else:
+        print("\n\n Training without regularizer")
+        regularizer = None
+
     if rank == 0 and opts.sample_num > 0:
         sample_ids = np.random.choice(
             len(val_loader), opts.sample_num, replace=False
@@ -498,7 +516,9 @@ def run_step(opts, world_size, rank, device):
                 optim=optimizer,
                 train_loader=train_loader,
                 scheduler=scheduler,
-                logger=logger
+                logger=logger,
+                reg=regularizer,
+                save_path = opts.fisher_save_path
             )
 
             logger.info(

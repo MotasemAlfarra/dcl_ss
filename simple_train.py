@@ -182,7 +182,7 @@ class Trainer:
                 train_loader, self.device, logger, mode="entropy"
             )
 
-    def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
+    def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None, reg=None, save_path=None):
         """Train and return epoch loss"""
         # logger.info(f"Pseudo labeling is: {self.pseudo_labeling}")
         logger.info("Epoch %d, lr = %f" % (cur_epoch, optim.param_groups[0]['lr']))
@@ -220,8 +220,13 @@ class Trainer:
 
                 loss = loss.mean()  # scalar
 
+                #######################################################################################
+                #######################################################################################
+                l_reg = reg.penalty(model) if reg is not None else 0.0
+                #######################################################################################
+                #######################################################################################
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss #+ lkd + lde + l_icarl + pod_loss + loss_entmin
+                loss_tot = loss + l_reg #+ lkd + lde + l_icarl + pod_loss + loss_entmin
 
                 with amp.scale_loss(loss_tot, optim) as scaled_loss:
                     scaled_loss.backward()
@@ -261,6 +266,15 @@ class Trainer:
                     logger.add_scalar('Loss', interval_loss, x)
                 interval_loss = 0.0
 
+        #######################################################################################
+        #######################################################################################
+        if reg is not None:
+            reg.update(model, images, labels)
+            if distributed.get_rank() == 0:
+                print('fisher is updated, now we are saving it!')    
+                reg.save_fisher(save_path)
+        #######################################################################################
+        #######################################################################################
         # collect statistics from multiple processes
         epoch_loss = torch.tensor(epoch_loss).to(self.device)
         reg_loss = torch.tensor(reg_loss).to(self.device)

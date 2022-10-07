@@ -339,7 +339,7 @@ def get_argparser():
         "--regularizer_new",
         default=None,
         type=str,
-        choices=['ewc', 'rw', 'pi'],
+        choices=['ewc', 'mas', 'lwf'],
         help="regularizer you want to use. Default is None"
     )
     parser.add_argument(
