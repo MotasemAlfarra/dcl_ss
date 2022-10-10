@@ -31,7 +31,7 @@ class EWC(object):
             self.fisher[n] = (self.alpha * (p.grad ** 2)) + ((1 - self.alpha) * self.fisher[n].to(p))
         model.zero_grad()
         
-    def penalty(self, model):
+    def penalty(self, model, images=None, current_predictions=None):
         loss = 0.
         for n, p in model.named_parameters():
             loss += (self.fisher[n].to(p) * (p - self.model_old_dict[n]) ** 2).sum()

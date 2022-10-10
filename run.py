@@ -465,12 +465,21 @@ def run_step(opts, world_size, rank, device):
         print("\n Initializing the regularizer to ", opts.regularizer_new)
         from utils.ewc import EWC
         from utils.mas import MAS
+        from utils.lwf import LwF
         regularizers = {
         "ewc": EWC,
-        "mas": MAS
+        "mas": MAS,
+        "lwf": LwF
         }
         method = regularizers[opts.regularizer_new]
-        regularizer = method(model, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
+        model_reg = make_model(
+            opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step)
+        )
+        model_reg.requires_grad_(False)
+        # Put a copy of the model on GPU
+        model_reg = DistributedDataParallel(model_reg.cuda(device))
+        model_reg.load_state_dict(model.state_dict())
+        regularizer = method(model_reg, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
         if opts.fisher_load_path is not None:
             print("\n Loading Fisher matrix from saved data\n")
             regularizer.load_fisher(opts.fisher_load_path)

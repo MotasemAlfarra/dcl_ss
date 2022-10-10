@@ -222,7 +222,8 @@ class Trainer:
 
                 #######################################################################################
                 #######################################################################################
-                l_reg = reg.penalty(model) if reg is not None else 0.0
+                l_reg = reg.penalty(model, images, outputs) if reg is not None else 0.0
+                print("l_reg is {}".format(l_reg))
                 #######################################################################################
                 #######################################################################################
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
