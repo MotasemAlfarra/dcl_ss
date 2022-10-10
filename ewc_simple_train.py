@@ -219,12 +219,12 @@ class Trainer:
                     sample_weights[original_labels >= 0] = self.sample_weights_new
 
                 loss = loss.mean()  # scalar
-
+                print("CE loss is {}".format(loss))
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
                 #+ lkd + lde + l_icarl + pod_loss + loss_entmin
                 # Adding a regularization loss
                 if reg is not None:
-                    l_reg = reg.penalty(model)
+                    l_reg = reg.penalty(model, images, outputs)
                     print("\n l_reg is {}\n".format(l_reg))
                 else:
                     l_reg = 0.0
