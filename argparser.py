@@ -366,6 +366,13 @@ def get_argparser():
         type=str,
         help="path to load fisher matrix for ewc"
     )
+    ####################Aguments for replay methods###########################
+    parser.add_argument(
+        "--buffer_size",
+        type=int,
+        default=0,
+        help="set this par to a value greater than 0 to enable regularization"
+    )
     # Arguments for ICaRL (from https://arxiv.org/abs/1611.07725)
     parser.add_argument(
         "--icarl", default=False, action='store_true', help="If enable ICaRL or not (def is not)"
