@@ -1,3 +1,4 @@
+from asyncio.log import logger
 import copy
 import os
 import random
@@ -15,11 +16,11 @@ import tasks
 import utils
 from dataset import (AdeSegmentationIncremental, ACDC_Incremental,
                      CityscapesSegmentationIncrementalDomain, CARLA_Incremental,
-                     BDD100K_Incremental, IDD_Incremental, VIPER, VIPER_Incremental,
+                     BDD100K_Incremental, IDD_Incremental, VIPER_Incremental,
                      VOCSegmentationIncremental, transform)
 from metrics import StreamSegMetrics
 from segmentation_module import make_model
-from simple_train import Trainer
+from replay_train_viper import Trainer
 from utils.logger import Logger
 
 
@@ -72,85 +73,96 @@ def get_dataset(opts):
     labels, labels_old, path_base = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
     labels_cum = labels_old + labels
 
-    if opts.dataset == 'voc':
-        dataset = VOCSegmentationIncremental
-    elif opts.dataset == 'ade':
-        dataset = AdeSegmentationIncremental
-    elif opts.dataset == 'cityscapes_domain':
-        dataset = CityscapesSegmentationIncrementalDomain
-    elif opts.dataset == 'acdc':
-        dataset = ACDC_Incremental
-    elif opts.dataset == 'carla':
-        dataset = CARLA_Incremental
-    elif opts.dataset == 'bdd100k':
-        dataset = BDD100K_Incremental
-    elif opts.dataset == 'idd':
-        dataset = IDD_Incremental
-    elif opts.dataset == 'viper':
-        dataset = VIPER_Incremental
-    else:
-        raise NotImplementedError
+    datasets_paths={
+        'cityscapes_domain': "/export/share/datasets/cityscapes",
+        'acdc': "/home/malfarra/acdc",
+        'bdd100k': "/export/share/bdd", #You can ignore this line as we hard coded the path in the dataset file
+        'idd': "/export/share/idd"
+    }
 
-    if opts.overlap:
-        path_base += "-ov"
+    all_trainsets = []
+    all_valsets = []
+    all_testsets = []
+    for name in ['cityscapes_domain', 'idd', 'bdd100k', 'acdc']:
+        opts.dataset = name
+        if opts.dataset == 'cityscapes_domain':
+            dataset = CityscapesSegmentationIncrementalDomain
+        elif opts.dataset == 'acdc':
+            dataset = ACDC_Incremental
+        elif opts.dataset == 'bdd100k':
+            dataset = BDD100K_Incremental
+        elif opts.dataset == 'idd':
+            dataset = IDD_Incremental
+        else:
+            raise NotImplementedError
+        if opts.overlap:
+            path_base += "-ov"
 
-    if not os.path.exists(path_base):
-        os.makedirs(path_base, exist_ok=True)
+        if not os.path.exists(path_base):
+            os.makedirs(path_base, exist_ok=True)
 
-    train_dst = dataset(
-        root=opts.data_root,
-        train=True,
-        transform=train_transform,
-        labels=list(labels),
-        labels_old=list(labels_old),
-        idxs_path=path_base + f"/train-{opts.step}.npy",
-        masking=not opts.no_mask,
-        overlap=opts.overlap,
-        disable_background=opts.disable_background,
-        data_masking=opts.data_masking,
-        test_on_val=opts.test_on_val,
-        step=opts.step
-    )
-
-
-
-    if not opts.no_cross_val:  # if opts.cross_val:
-        train_len = int(0.8 * len(train_dst))
-        val_len = len(train_dst) - train_len
-        train_dst, val_dst = torch.utils.data.random_split(train_dst, [train_len, val_len])
-    else:  # don't use cross_val
-        val_dst = dataset(
-            root=opts.data_root,
-            train=False,
-            transform=val_transform,
+        train_dst = dataset(
+            root=datasets_paths[name],
+            train=True,
+            transform=train_transform,
             labels=list(labels),
             labels_old=list(labels_old),
-            idxs_path=path_base + f"/val-{opts.step}.npy",
+            idxs_path=path_base + f"/train-{opts.step}.npy",
             masking=not opts.no_mask,
-            overlap=True,
+            overlap=opts.overlap,
             disable_background=opts.disable_background,
             data_masking=opts.data_masking,
+            test_on_val=opts.test_on_val,
             step=opts.step
         )
+        if not opts.no_cross_val:  # if opts.cross_val:
+            train_len = int(0.8 * len(train_dst))
+            val_len = len(train_dst) - train_len
+            train_dst, val_dst = torch.utils.data.random_split(train_dst, [train_len, val_len])
+        else:  # don't use cross_val
+            val_dst = dataset(
+                root=datasets_paths[name],
+                train=False,
+                transform=val_transform,
+                labels=list(labels),
+                labels_old=list(labels_old),
+                idxs_path=path_base + f"/val-{opts.step}.npy",
+                masking=not opts.no_mask,
+                overlap=True,
+                disable_background=opts.disable_background,
+                data_masking=opts.data_masking,
+                step=opts.step
+            )
 
-    image_set = 'train' if opts.val_on_trainset else 'val'
-    test_dst = dataset(
-        root=opts.data_root,
-        train=opts.val_on_trainset,
-        transform=val_transform,
-        labels=list(labels_cum),
-        idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy",
-        disable_background=opts.disable_background,
-        test_on_val=opts.test_on_val,
-        step=opts.step,
-        ignore_test_bg=opts.ignore_test_bg
-    )
+        image_set = 'train' if opts.val_on_trainset else 'val'
+        test_dst = dataset(
+            root=datasets_paths[name],
+            train=opts.val_on_trainset,
+            transform=val_transform,
+            labels=list(labels_cum),
+            idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy",
+            disable_background=opts.disable_background,
+            test_on_val=opts.test_on_val,
+            step=opts.step,
+            ignore_test_bg=opts.ignore_test_bg
+        )
+
+        all_trainsets.append(train_dst)
+        all_valsets.append(val_dst)
+        all_testsets.append(test_dst)
+
+    train_dst = torch.utils.data.ConcatDataset(all_trainsets)
+    val_dst = torch.utils.data.ConcatDataset(all_valsets)
+    test_dst = torch.utils.data.ConcatDataset(all_testsets)
+
+    logger.info("\n\n The total number of images in training set is {} and on the val set is {} and for test set is {}".format(
+                                                len(train_dst), len(val_dst), len(test_dst)))
     num_images = len(train_dst)
     if opts.use_carla:
-        actual_skip = int(round(opts.skip*18178/(num_images)))
         print("using carla")
+        actual_skip = round(opts.skip*18178/(num_images))
         carla = CARLA_Incremental
-        carla_train_dst = carla(
+        viper_train_dst = carla(
             root=opts.data_root,
             train=True,
             transform=train_transform,
@@ -165,11 +177,12 @@ def get_dataset(opts):
             test_on_val=opts.test_on_val,
             step=opts.step
         )
-        train_dst = torch.utils.data.ConcatDataset([train_dst, carla_train_dst])
-        print("\n\n The total number of images in training set after adding CARLA is {}".format(
-                                                len(train_dst)))
+        # train_dst = torch.utils.data.ConcatDataset([train_dst, carla_train_dst])
+        # logger.info("\n\n The total number of images in training set after adding CARLA is {} and on the val set is {} and for test set is {}".format(
+        #                                         len(train_dst), len(val_dst), len(test_dst)))
+
     if opts.use_viper:
-        actual_skip = int(round(opts.skip*18392/(num_images)))
+        actual_skip = round(opts.skip*18392/(num_images))
         print("using viper")
         viper = VIPER_Incremental
         viper_train_dst = viper(
@@ -187,29 +200,10 @@ def get_dataset(opts):
             test_on_val=opts.test_on_val,
             step=opts.step
         )
-        train_dst = torch.utils.data.ConcatDataset([train_dst, viper_train_dst])
-        print("\n\n The total number of images in training set after adding VIPER is {}".format(
-                                                len(train_dst)))
-    # if opts.use_acdc:
-    #     print("using acdc")
-    #     acdc = ACDC_Incremental
-    #     acdc_train_dst = acdc(
-    #         root='/home/malfarra/acdc',
-    #         train=True,
-    #         transform=train_transform,
-    #         labels=list(labels),
-    #         labels_old=list(labels_old),
-    #         idxs_path=path_base + f"/train-{opts.step}.npy",
-    #         masking=not opts.no_mask,
-    #         overlap=opts.overlap,
-    #         disable_background=opts.disable_background,
-    #         data_masking=opts.data_masking,
-    #         test_on_val=opts.test_on_val,
-    #         step=opts.step
-    #     )
-    #     train_dst = torch.utils.data.ConcatDataset([train_dst, acdc_train_dst])
-
-    return train_dst, val_dst, test_dst, len(labels_cum)
+        # train_dst = torch.utils.data.ConcatDataset([train_dst, viper_train_dst])
+        # print("\n\n The total number of images in training set after adding VIPER is {}".format(
+                                                # len(train_dst)))
+    return train_dst, val_dst, test_dst, len(labels_cum), viper_train_dst
 
 
 def main(opts):
@@ -267,14 +261,21 @@ def run_step(opts, world_size, rank, device):
     random.seed(opts.random_seed)
 
     # xxx Set up dataloader
-    train_dst, val_dst, test_dst, n_classes = get_dataset(opts)
+    train_dst, val_dst, test_dst, n_classes, viper_set = get_dataset(opts)
     # reset the seed, this revert changes in random seed
     random.seed(opts.random_seed)
     
     train_loader = data.DataLoader(
         train_dst,
-        batch_size=opts.batch_size,
-        sampler=DistributedSampler(train_dst, shuffle=True),#, num_replicas=world_size, rank=rank),
+        batch_size=int(opts.batch_size/2),
+        sampler=DistributedSampler(train_dst, shuffle=False),#, num_replicas=world_size, rank=rank),
+        num_workers=opts.num_workers,
+        drop_last=True
+    )
+    train_loader_viper = data.DataLoader(
+        viper_set,
+        batch_size=int(opts.batch_size/2),
+        sampler=DistributedSampler(viper_set, shuffle=True),#, num_replicas=world_size, rank=rank),
         num_workers=opts.num_workers,
         drop_last=True
     )
@@ -455,37 +456,16 @@ def run_step(opts, world_size, rank, device):
     else:
         if opts.step == 0:
             logger.info("[!] Train from scratch")
-
+    
+    #### Deploying a buffer for replay methods
+    buffer=None
+    if opts.buffer_size >0:
+        from utils.replay_buffer import Replay_Buffer
+        buffer = Replay_Buffer(buffer_size=opts.buffer_size, batch_size=opts.batch_size)
+    
     # xxx Train procedure
     # print opts before starting training to log all parameters
     logger.add_table("Opts", vars(opts))
-
-
-    if opts.regularizer_new is not None:
-        print("\n Initializing the regularizer to ", opts.regularizer_new)
-        from utils.ewc import EWC
-        from utils.mas import MAS
-        from utils.lwf import LwF
-        regularizers = {
-        "ewc": EWC,
-        "mas": MAS,
-        "lwf": LwF
-        }
-        method = regularizers[opts.regularizer_new]
-        model_reg = make_model(
-            opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step)
-        )
-        model_reg.requires_grad_(False)
-        # Put a copy of the model on GPU
-        model_reg = DistributedDataParallel(model_reg.cuda(device))
-        model_reg.load_state_dict(model.state_dict())
-        regularizer = method(model_reg, device, alpha=opts.reg_alpha_new, importance=opts.reg_importance_new)
-        if opts.fisher_load_path is not None:
-            print("\n Loading Fisher matrix from saved data\n")
-            regularizer.load_fisher(opts.fisher_load_path)
-    else:
-        print("\n\n Training without regularizer")
-        regularizer = None
 
     if rank == 0 and opts.sample_num > 0:
         sample_ids = np.random.choice(
@@ -525,9 +505,9 @@ def run_step(opts, world_size, rank, device):
                 optim=optimizer,
                 train_loader=train_loader,
                 scheduler=scheduler,
-                logger=logger,
-                reg=regularizer,
-                save_path = opts.fisher_save_path
+                logger=logger, 
+                replay_buffer=buffer,
+                synth_loader=train_loader_viper
             )
 
             logger.info(

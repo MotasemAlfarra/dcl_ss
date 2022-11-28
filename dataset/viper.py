@@ -74,7 +74,7 @@ class VIPER_Incremental(data.Dataset):
         train=True,
         transform=None,
         labels=range(19),
-        skip=50,
+        skip=1,
         idxs_path=None,
         masking=True,
         overlap=True,

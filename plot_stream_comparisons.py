@@ -42,14 +42,14 @@ class_maps = {
 def main(args):
     base_path = './compressed_results/classes/'
     path_stream = base_path + class_maps[args.class_num]+'/' +  args.experiment
-    path_stream_with_carla = base_path+ class_maps[args.class_num]+'/' +  args.experiment + '_with_carla'
+    # path_stream_with_carla = base_path+ class_maps[args.class_num]+'/' +  args.experiment + '_with_carla'
     path_stream_with_viper = base_path+ class_maps[args.class_num]+'/' +  args.experiment + '_with_viper'
-    path_stream_with_carla_and_viper = base_path+ class_maps[args.class_num]+'/' +  args.experiment + '_with_carla_and_viper'
+    # path_stream_with_carla_and_viper = base_path+ class_maps[args.class_num]+'/' +  args.experiment + '_with_carla_and_viper'
 
     with open(path_stream, 'rb') as f:
         stream_results = pickle.load(f)
-    with open(path_stream_with_carla, 'rb') as f:
-        stream_results_with_carla = pickle.load(f)
+    # with open(path_stream_with_carla, 'rb') as f:
+    #     stream_results_with_carla = pickle.load(f)
     with open(path_stream_with_viper, 'rb') as f:
         stream_results_with_viper = pickle.load(f)
     # with open(path_stream_with_carla_and_viper, 'rb') as f:
@@ -60,9 +60,9 @@ def main(args):
     plt.scatter(x_stream, mIOUS_stream)
     legends += ['stream']
 
-    x_stream_with_carla, mIOUS_stream_with_carla = zip(*stream_results_with_carla[args.dataset])
-    plt.scatter(x_stream_with_carla, mIOUS_stream_with_carla)
-    legends += ['stream_with_carla']
+    # x_stream_with_carla, mIOUS_stream_with_carla = zip(*stream_results_with_carla[args.dataset])
+    # plt.scatter(x_stream_with_carla, mIOUS_stream_with_carla)
+    # legends += ['stream_with_carla']
 
     x_stream_with_viper, mIOUS_stream_with_viper = zip(*stream_results_with_viper[args.dataset])
     plt.scatter(x_stream_with_viper, mIOUS_stream_with_viper)
@@ -75,7 +75,7 @@ def main(args):
     if class_maps[args.class_num] == 'mIOU':
         print("dataset ", args.dataset)
         print(return_at_index(x_stream, mIOUS_stream, args.idx))
-        print(return_at_index(x_stream_with_carla, mIOUS_stream_with_carla, args.idx))
+        # print(return_at_index(x_stream_with_carla, mIOUS_stream_with_carla, args.idx))
         print(return_at_index(x_stream_with_viper, mIOUS_stream_with_viper, args.idx))
         # print(return_at_index(x_stream_with_carla_and_viper, mIOUS_stream_with_carla_and_viper, 1))
 

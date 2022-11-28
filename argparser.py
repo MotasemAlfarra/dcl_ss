@@ -104,7 +104,7 @@ def get_argparser():
     parser.add_argument(    
         "--use_acdc", default=False, action='store_true', help="include acdc in the training"
     )
-    parser.add_argument("--skip", type=int, default=100, help='how many samples to skip from carla (default: 100)')
+    parser.add_argument("--skip", type=float, default=100, help='how many samples to skip from carla (default: 100)')
     # Method Options
     # BE CAREFUL USING THIS, THEY WILL OVERRIDE ALL THE OTHER PARAMETERS.
     parser.add_argument(
